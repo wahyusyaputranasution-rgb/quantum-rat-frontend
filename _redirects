@@ -1,3 +1,2 @@
-# Cloudflare Pages redirects
-/*    /index.html   200
-/dropper    /dropper.html   200
+/index.html /
+/dropper /dropper.html 200
